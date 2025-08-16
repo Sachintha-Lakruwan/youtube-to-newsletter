@@ -1,0 +1,77 @@
+from googleapiclient.discovery import build
+import os
+import isodate
+
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+YOUTUBE_API_SERVICE_NAME = "youtube"
+YOUTUBE_API_VERSION = "v3"
+
+
+youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=YOUTUBE_API_KEY)
+
+def iso8601_duration_to_seconds(duration: str) -> int:
+    """
+    Convert ISO 8601 duration string to seconds.
+    Example: PT4M20S -> 260
+    """
+    return int(isodate.parse_duration(duration).total_seconds())
+
+def fetch_videos_for_subdomain(subdomain: str, max_results: int = 10) -> list[dict]:
+    """
+    Fetch videos for a given subdomain (keyword/topic).
+    Filters out Shorts (duration < 60 sec).
+    Returns list of video metadata dicts:
+    {
+        "video_id": str,
+        "title": str,
+        "description": str,
+        "published_date": str,
+        "views": int
+    }
+    """
+    print(f"[Fetcher] Fetching videos for subdomain: {subdomain}")
+
+    videos = []
+
+    # Search videos by keyword
+    request = youtube.search().list(
+        q=subdomain,
+        type="video",
+        part="id,snippet",
+        maxResults=max_results
+    )
+    response = request.execute()
+
+    for item in response.get("items", []):
+        video_id = item["id"]["videoId"]
+        title = item["snippet"]["title"]
+        description = item["snippet"]["description"]
+        published_date = item["snippet"]["publishedAt"]
+
+        # Fetch video details for duration and views
+        details_request = youtube.videos().list(
+            part="contentDetails,statistics",
+            id=video_id
+        )
+        details_response = details_request.execute()
+        details = details_response["items"][0]
+
+        # Skip Shorts (<60 sec)
+        duration = details["contentDetails"]["duration"]
+        if iso8601_duration_to_seconds(duration) < 60:
+            continue
+
+        # Views
+        views = int(details["statistics"].get("viewCount", 0))
+
+        # Append video metadata dict
+        videos.append({
+            "video_id": video_id,
+            "title": title,
+            "description": description,
+            "published_date": published_date,
+            "views": views
+        })
+
+    print(f"[Fetcher] Total videos fetched for {subdomain}: {len(videos)}")
+    return videos

@@ -28,7 +28,7 @@ summaries_collection = db["summaries"]
 metadata_collection.create_index("video_id", unique=True)
 summaries_collection.create_index("video_id", unique=True)
 
-def insert_metadata(video_id: str, published_date: str, title: str, views: int, description: str):
+def insert_metadata(video_id: str, published_date: str, title: str, views: int, description: str,subdomain: str):
     """Insert or update video metadata."""
     metadata_collection.update_one(
         {"video_id": video_id},
@@ -36,7 +36,8 @@ def insert_metadata(video_id: str, published_date: str, title: str, views: int, 
             "published_date": published_date,
             "title": title,
             "views": views,
-            "description": description
+            "description": description,
+            "subdomain": subdomain
         }},
         upsert=True
     )
@@ -53,6 +54,31 @@ def insert_summaries(video_id: str, transcript: str, abstractive_summary: str, e
         upsert=True
     )
 
+def store_transcript(video_id: str, transcript: str):
+    """Insert or update transcript only."""
+    summaries_collection.update_one(
+        {"video_id": video_id},
+        {"$set": {"transcript": transcript}},
+        upsert=True
+    )
+
+def store_extractive(video_id: str, extractive_summary: str):
+    """Insert or update transcript only."""
+    summaries_collection.update_one(
+        {"video_id": video_id},
+        {"$set": {"extractive_summary": extractive_summary}},
+        upsert=True
+    )
+
+def store_abstractive(video_id: str, abstractive_summary: str):
+    """Insert or update transcript only."""
+    summaries_collection.update_one(
+        {"video_id": video_id},
+        {"$set": {"extractive_summary": abstractive_summary}},
+        upsert=True
+    )
+
+    
 def get_metadata(video_id: str):
     return metadata_collection.find_one({"video_id": video_id})
 
