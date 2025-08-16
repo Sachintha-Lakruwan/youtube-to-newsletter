@@ -1,6 +1,9 @@
 from googleapiclient.discovery import build
 import os
 import isodate
+from dotenv import load_dotenv
+
+load_dotenv()
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_API_SERVICE_NAME = "youtube"
@@ -41,7 +44,6 @@ def fetch_videos_for_subdomain(subdomain: str, max_results: int = 10) -> list[di
         maxResults=max_results
     )
     response = request.execute()
-
     for item in response.get("items", []):
         video_id = item["id"]["videoId"]
         title = item["snippet"]["title"]
@@ -61,6 +63,9 @@ def fetch_videos_for_subdomain(subdomain: str, max_results: int = 10) -> list[di
         if iso8601_duration_to_seconds(duration) < 60:
             continue
 
+        if details["contentDetails"].get("caption", "false") != "true":
+            continue
+
         # Views
         views = int(details["statistics"].get("viewCount", 0))
 
@@ -72,6 +77,8 @@ def fetch_videos_for_subdomain(subdomain: str, max_results: int = 10) -> list[di
             "published_date": published_date,
             "views": views
         })
+
+
 
     print(f"[Fetcher] Total videos fetched for {subdomain}: {len(videos)}")
     return videos

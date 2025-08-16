@@ -19,7 +19,7 @@ def orchestrator_agent(subdomains: List[str]) -> Dict[str, Any]:
 
         try:
             # Run LangGraph workflow for this subdomain
-            state_after_run = graph.run(initial_state=initial_state)
+            state_after_run = graph.invoke(initial_state)
             final_states[subdomain] = state_after_run
             print(f"[Orchestrator] Completed workflow for subdomain: {subdomain}")
         except Exception as e:

@@ -1,17 +1,27 @@
-# src/qdrant/qdrant_client.py
-from qdrant_client import QdrantClient, models
+# src/qdrant/qdrant_cli.py
+from qdrant_client import QdrantClient
+from qdrant_client.models import PointStruct
 import os
+from dotenv import load_dotenv
+import uuid
 
+load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None)
+QDRANT_API_KEY = os.getenv("QDRANT_API", None)
 
 
 client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
 # Collection names
 TITLE_DESC_COLLECTION = "video_title_desc"
+
 SUMMARY_COLLECTION = "video_summary"
+
+
+
+def video_id_to_uuid(video_id: str) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, video_id))
 
 def insert_title_desc(video_id: str, vector: list[float], metadata: dict):
     """
@@ -21,8 +31,8 @@ def insert_title_desc(video_id: str, vector: list[float], metadata: dict):
     client.upsert(
         collection_name=TITLE_DESC_COLLECTION,
         points=[
-            models.PointStruct(
-                id=video_id,
+            PointStruct(
+                id=video_id_to_uuid(video_id),
                 vector=vector,
                 payload=metadata
             )
@@ -32,13 +42,13 @@ def insert_title_desc(video_id: str, vector: list[float], metadata: dict):
 def insert_summary(video_id: str, vector: list[float], metadata: dict):
     """
     Insert embedding for extractive summary
-    metadata: {video_id, published_date}
+    metadata: additional info(e.g.:video_id)
     """
     client.upsert(
         collection_name=SUMMARY_COLLECTION,
         points=[
-            models.PointStruct(
-                id=video_id,
+            PointStruct(
+                id=video_id_to_uuid(video_id),
                 vector=vector,
                 payload=metadata
             )

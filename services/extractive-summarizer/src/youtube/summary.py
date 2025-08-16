@@ -2,9 +2,9 @@ import nltk
 nltk.download('punkt_tab')
 from sentence_transformers import SentenceTransformer, util
 from nltk.tokenize import sent_tokenize
-from embeddings.embedder import embed_summary
+from embeddings.embedder import embed_extractive_summary
 from db.mongo_client import store_extractive
-from qdrant.qdrant_client import insert_summary_embedding
+from qdrant.qdrant_cli import insert_summary
 
 sbert_model_name = "all-MiniLM-L6-v2"
 sbert = SentenceTransformer(sbert_model_name)
@@ -87,10 +87,11 @@ def store_extractive_summary(video_id: str, extractive_summary: str, store_qdran
     store_extractive(video_id=video_id,extractive_summary=extractive_summary)
 
     # Store embedding in Qdrant
+    '''
     if store_qdrant:
-        vector = embed_summary(extractive_summary)
-        insert_summary_embedding(
+        vector = embed_extractive_summary(extractive_summary)
+        insert_summary(
             video_id=video_id,
             vector=vector.tolist() if hasattr(vector, "tolist") else vector,
             metadata={"video_id": video_id}
-        )
+        )'''

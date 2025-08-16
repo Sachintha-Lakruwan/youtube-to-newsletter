@@ -1,7 +1,7 @@
 from typing import Dict, Any
 from youtube.fetcher import fetch_videos_for_subdomain
 from db.mongo_client import insert_metadata
-from qdrant.qdrant_client import insert_title_desc
+from qdrant.qdrant_cli import insert_title_desc
 from embeddings.embedder import embed_title_desc
 
 def fetch_youtube_videos_agent(state: Dict[str, Any]) -> Dict[str, Any]:
