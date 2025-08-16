@@ -87,11 +87,11 @@ def store_extractive_summary(video_id: str, extractive_summary: str, store_qdran
     store_extractive(video_id=video_id,extractive_summary=extractive_summary)
 
     # Store embedding in Qdrant
-    '''
+    
     if store_qdrant:
         vector = embed_extractive_summary(extractive_summary)
         insert_summary(
             video_id=video_id,
             vector=vector.tolist() if hasattr(vector, "tolist") else vector,
             metadata={"video_id": video_id}
-        )'''
+        )
