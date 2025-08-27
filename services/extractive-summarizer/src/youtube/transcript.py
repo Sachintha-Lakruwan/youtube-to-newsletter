@@ -17,5 +17,5 @@ def fetch_transcript(video_id: str) -> str:
 
                     texts.append(getattr(item, "text", str(item)))
             return " ".join(texts)
-    except Exception as e2:
-            raise RuntimeError(f"Failed to fetch transcript")
+    except Exception :
+            return "No transcript available"

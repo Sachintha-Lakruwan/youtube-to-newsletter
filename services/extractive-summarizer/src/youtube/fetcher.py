@@ -15,7 +15,6 @@ youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=YOUT
 def iso8601_duration_to_seconds(duration: str) -> int:
     """
     Convert ISO 8601 duration string to seconds.
-    Example: PT4M20S -> 260
     """
     return int(isodate.parse_duration(duration).total_seconds())
 
@@ -23,14 +22,7 @@ def fetch_videos_for_subdomain(subdomain: str, max_results: int = 10) -> list[di
     """
     Fetch videos for a given subdomain (keyword/topic).
     Filters out Shorts (duration < 60 sec).
-    Returns list of video metadata dicts:
-    {
-        "video_id": str,
-        "title": str,
-        "description": str,
-        "published_date": str,
-        "views": int
-    }
+    Returns list of video metadata dicts
     """
     print(f"[Fetcher] Fetching videos for subdomain: {subdomain}")
 
@@ -49,6 +41,9 @@ def fetch_videos_for_subdomain(subdomain: str, max_results: int = 10) -> list[di
         title = item["snippet"]["title"]
         description = item["snippet"]["description"]
         published_date = item["snippet"]["publishedAt"]
+        channel_id=item["snippet"]["channelId"]
+        thumbnail_url=item["snippet"]["thumbnails"]['default']['url']
+
 
         # Fetch video details for duration and views
         details_request = youtube.videos().list(
@@ -66,8 +61,10 @@ def fetch_videos_for_subdomain(subdomain: str, max_results: int = 10) -> list[di
         if details["contentDetails"].get("caption", "false") != "true":
             continue
 
-        # Views
+        # views
         views = int(details["statistics"].get("viewCount", 0))
+        # tags
+        tags=[subdomain]
 
         # Append video metadata dict
         videos.append({
@@ -75,7 +72,9 @@ def fetch_videos_for_subdomain(subdomain: str, max_results: int = 10) -> list[di
             "title": title,
             "description": description,
             "published_date": published_date,
-            "views": views
+            "channel_id": channel_id,
+            "tags": tags,
+            "thumbnail_url": thumbnail_url
         })
 
 
