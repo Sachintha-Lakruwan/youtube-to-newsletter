@@ -13,3 +13,4 @@ langchain_google_genai
 langgraph              
 python-dotenv          
 youtube-transcript-api 
+supabase
