@@ -17,6 +17,7 @@ except ConnectionFailure as e:
     print(f"MongoDB connection failed: {e}")
     raise
 
+
 # Get the database
 db = client[DB_NAME]
 

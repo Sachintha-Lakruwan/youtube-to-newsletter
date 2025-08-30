@@ -22,7 +22,7 @@ def insert_video(video: dict):
     embedding_id = video_id_to_uuid(video['video_id'])
 
     record = {
-        'id': video['video_id'],  
+        'video_id': video['video_id'],  
         'title': video['title'],
         'description': video['description'],
         'tags': video['tags'],  

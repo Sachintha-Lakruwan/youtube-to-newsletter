@@ -20,6 +20,7 @@ def summarizer_agent(state: Dict[str, Any], top_k=8, alpha=0.7) -> Dict[str, Any
 
         # Generate extractive summary and store it in mongodb and it's embedding in qdrant
         extractive_summary = generate_extractive_summary(transcript, top_k=top_k, alpha=alpha)
+        
         store_extractive_summary(video_id=video_id, extractive_summary=extractive_summary)
 
     return state  # return state unchanged
