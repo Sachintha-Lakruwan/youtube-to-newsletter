@@ -14,3 +14,4 @@ langgraph
 python-dotenv          
 youtube-transcript-api 
 supabase
+nltk
