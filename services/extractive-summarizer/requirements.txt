@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pymongo
+qdrant-client
+torch
+transformers
+sentence-transformers  
+google-api-python-client  
+isodate 
+langchain_core
+langchain_community
+langchain_google_genai               
+langgraph              
+python-dotenv          
+youtube-transcript-api 
+supabase

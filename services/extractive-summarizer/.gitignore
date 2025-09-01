@@ -1,0 +1,42 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+sdist/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environment
+.venv
+venv/
+env/
+/bin/
+/include/
+/lib/
+/lib64/
+/Scripts/
+/share/
+/man/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.env
+
+# Various editors and IDEs
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
