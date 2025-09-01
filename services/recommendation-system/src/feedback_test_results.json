@@ -1,0 +1,57 @@
+{
+  "timestamp": "2025-08-31T11:32:57.677999",
+  "summary": {
+    "total": 9,
+    "passed": 8,
+    "failed": 1,
+    "errors": 0,
+    "success_rate": 88.88888888888889
+  },
+  "detailed_results": [
+    {
+      "test": "Feedback Data Structure Validation",
+      "status": "PASS",
+      "result": true
+    },
+    {
+      "test": "Active Users Filtering",
+      "status": "PASS",
+      "result": true
+    },
+    {
+      "test": "Feedback Aggregation by User",
+      "status": "PASS",
+      "result": true
+    },
+    {
+      "test": "Rating Classification",
+      "status": "PASS",
+      "result": true
+    },
+    {
+      "test": "High Rating Videos Extraction",
+      "status": "PASS",
+      "result": true
+    },
+    {
+      "test": "Feedback Data Completeness",
+      "status": "PASS",
+      "result": true
+    },
+    {
+      "test": "UserFeedbackAggregation Model",
+      "status": "PASS",
+      "result": true
+    },
+    {
+      "test": "Rating Weights Calculation",
+      "status": "FAIL",
+      "result": false
+    },
+    {
+      "test": "Date Range Filtering",
+      "status": "PASS",
+      "result": true
+    }
+  ]
+}
