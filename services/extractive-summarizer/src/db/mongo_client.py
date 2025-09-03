@@ -75,7 +75,7 @@ def store_abstractive(video_id: str, abstractive_summary: str):
     """Insert or update transcript only."""
     summaries_collection.update_one(
         {"video_id": video_id},
-        {"$set": {"extractive_summary": abstractive_summary}},
+        {"$set": {"abstractive_summary": abstractive_summary}},
         upsert=True
     )
 
