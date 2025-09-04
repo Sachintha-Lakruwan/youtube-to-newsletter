@@ -50,7 +50,7 @@ export default function History({
   const [error, setError] = useState<string | null>(null);
 
   // YouTube API key - you'll need to replace this with your actual API key
-  const YOUTUBE_API_KEY = "AIzaSyBjMFCMp2vAkaR1V8BqX1vdeIHv2tQCJKE";
+  const YOUTUBE_API_KEY = "";
 
   useEffect(() => {
     const fetchVideos = async () => {
