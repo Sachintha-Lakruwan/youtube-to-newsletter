@@ -1,17 +1,17 @@
-runtime: nodejs20
+# runtime: nodejs20
 
-handlers:
-  # Serve static assets from the assets directory (CSS, JS, images)
-  - url: /assets/(.*)
-    static_files: dist/assets/\1
-    upload: dist/assets/.*
+# handlers:
+#   # Serve static assets from the assets directory (CSS, JS, images)
+#   - url: /assets/(.*)
+#     static_files: dist/assets/\1
+#     upload: dist/assets/.*
 
-  # Serve other static files from the dist directory
-  - url: /(.*\.(ico|json|txt|html|svg))
-    static_files: dist/\1
-    upload: dist/.*\.(ico|json|txt|html|svg)
+#   # Serve other static files from the dist directory
+#   - url: /(.*\.(ico|json|txt|html|svg))
+#     static_files: dist/\1
+#     upload: dist/.*\.(ico|json|txt|html|svg)
 
-  # Catch all other URLs and serve index.html (for client-side routing)
-  - url: /.*
-    static_files: dist/index.html
-    upload: dist/index.html
+#   # Catch all other URLs and serve index.html (for client-side routing)
+#   - url: /.*
+#     static_files: dist/index.html
+#     upload: dist/index.html
