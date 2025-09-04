@@ -7,135 +7,129 @@ from db.mongo_client import store_extractive
 from qdrant.qdrant_cli import insert_summary
 import torch
 from transformers import BartTokenizer, BartForConditionalGeneration
+from sklearn.cluster import KMeans
 
 # BART setup (abstractive)
 bart_tokenizer = BartTokenizer.from_pretrained("facebook/bart-large-cnn")
 bart_model = BartForConditionalGeneration.from_pretrained("facebook/bart-large-cnn")
 
-sbert_model_name = "all-MiniLM-L6-v2"
+sbert_model_name = "sentence-transformers/all-mpnet-base-v2"
 sbert = SentenceTransformer(sbert_model_name)
 
-def compute_relevance_scores(sentences):
-    """
-    Relevance score: cosine similarity of each sentence embedding to the mean document embedding.
-    Returns scores list matching sentences.
-    """
-    embeds = sbert.encode(sentences, convert_to_tensor=True, show_progress_bar=False)
-    doc_embed = embeds.mean(dim=0, keepdim=True)
-    cos = util.cos_sim(embeds, doc_embed).squeeze().cpu().numpy()
-    # normalize to 0..1
-    cos = (cos - cos.min()) / (cos.max() - cos.min() + 1e-8)
-    return cos.tolist(), embeds
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+sbert.to(device)
 
-def compute_coherence_scores(sentences, sent_embeds=None):
-    """
-    Coherence score for each sentence: similarity with the previous sentence (0 for first sentence).
-    We return a list same length as sentences.
-    """
-    if sent_embeds is None:
-        sent_embeds = sbert.encode(sentences, convert_to_tensor=True, show_progress_bar=False)
-    scores = [0.0] * len(sentences)
-    if len(sentences) < 2:
-        return scores
-    for i in range(1, len(sentences)):
-        sim = util.cos_sim(sent_embeds[i], sent_embeds[i-1]).item()
-        # normalize later combined with relevance; keep raw sim ([-1,1])
-        scores[i] = (sim + 1) / 2.0  # map to [0,1]
-    return scores
+# ---------------------------
+# Hierarchical embeddings
+# ---------------------------
+def get_hierarchical_embeddings(text, segment_size=8):
+    sentences = sent_tokenize(text)
+    if not sentences:
+        return [], torch.empty(0)
+    sentence_embs = sbert.encode(sentences, convert_to_tensor=True).to(device)
 
-# Select top-k extractive sentences using combined score
-def select_extractive(sentences, top_k=8, alpha=0.7):
-    """
-    alpha: weight for relevance, (1-alpha) for coherence
-    Returns selected sentences and their original indices (kept in original order).
-    """
-    relevance_scores, sent_embeds = compute_relevance_scores(sentences)
-    coherence_scores = compute_coherence_scores(sentences, sent_embeds)
-    final_scores = []
-    for r, c in zip(relevance_scores, coherence_scores):
-        final_scores.append(alpha * r + (1 - alpha) * c)
-    # pick top_k indices
-    import numpy as np
-    idx_sorted = np.argsort(final_scores)[::-1]
-    top_idx = sorted(idx_sorted[:min(top_k, len(sentences))])  # sort to keep original order
-    selected = [sentences[i] for i in top_idx]
-    return selected, top_idx, sent_embeds
+    # Segment embeddings
+    segment_embs = []
+    for i in range(0, len(sentences), segment_size):
+        chunk_emb = sentence_embs[i:i+segment_size].mean(dim=0)
+        segment_embs.extend([chunk_emb] * min(segment_size, len(sentences)-i))
+    segment_embs = torch.stack(segment_embs)
 
-def abstractive_rewrite(text, max_input_tokens=1024, max_output_tokens=500, min_output_tokens=120):
-    """
-    Feed text to BART and return abstractive summary string.
-    Text will be truncated if needed by tokenizer.
-    """
-    inputs = bart_tokenizer([text], max_length=max_input_tokens, truncation=True, return_tensors="pt")
-    with torch.no_grad():
+    # Weighted fusion
+    enriched_embs = 0.7 * sentence_embs + 0.3 * segment_embs
+    return sentences, enriched_embs
+
+# ---------------------------
+# Dynamic sentence count
+# ---------------------------
+def dynamic_top_k(n_sentences, short_k=20, long_k=50):
+    if n_sentences < 200:
+        return short_k
+    elif n_sentences > 800:
+        return long_k
+    else:
+        # Linear scaling
+        return int(short_k + (long_k - short_k) * (n_sentences / 800))
+    
+
+# ---------------------------
+# Cluster-based selection 
+# ---------------------------
+def select_sentences_cluster_with_lead_cosine(text, short_k=20, long_k=50, n_head=2):
+    sentences, enriched_embs = get_hierarchical_embeddings(text)
+    n_sentences = len(sentences)
+    if n_sentences == 0:
+        return ""
+
+    top_k = dynamic_top_k(n_sentences, short_k=short_k, long_k=long_k)
+
+    # Always include lead sentences
+    selected_idx = list(range(min(n_head, n_sentences)))
+
+    # If we already reached top_k, truncate
+    selected_idx = selected_idx[:top_k]
+    remaining = top_k - len(selected_idx)
+
+    if remaining > 0 and n_sentences > len(selected_idx):
+        # Cluster remaining sentences
+        cluster_candidates = [i for i in range(n_sentences) if i not in selected_idx]
+        n_clusters = min(remaining, max(1, len(cluster_candidates)//10))
+        if n_clusters > 0:
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+            cluster_embs = enriched_embs[cluster_candidates].cpu().numpy()
+            cluster_ids = kmeans.fit_predict(cluster_embs)
+
+            # Global embedding for cosine similarity
+            global_emb = enriched_embs.mean(dim=0, keepdim=True)
+
+            for cluster_id in range(n_clusters):
+                cluster_idx = [cluster_candidates[i] for i in range(len(cluster_candidates)) if cluster_ids[i]==cluster_id]
+                if not cluster_idx:
+                    continue
+                cluster_vectors = enriched_embs[cluster_idx]
+                sims = util.pytorch_cos_sim(cluster_vectors, global_emb).cpu().numpy().flatten()
+                best_idx = cluster_idx[sims.argmax()]
+                selected_idx.append(best_idx)
+                if len(selected_idx) >= top_k:
+                    break
+
+    selected_idx = sorted(selected_idx)[:top_k]
+    return " ".join([sentences[i] for i in selected_idx])
+
+# ---------------------------
+# Chunked abstractive rewrite
+# ---------------------------
+def abstractive_rewrite_long_summary(extractive_summary, chunk_size=200, max_length=150, min_length=40):
+    words = extractive_summary.split()
+    chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+
+    abstractive_chunks = []
+    for chunk in chunks:
+        inputs = bart_tokenizer(chunk, return_tensors="pt", truncation=True, max_length=1024).to(device)
         summary_ids = bart_model.generate(
-            inputs["input_ids"],
-            num_beams=5,
-            length_penalty=1.0,
-            max_length=max_output_tokens,
-            min_length=min_output_tokens,
+            inputs.input_ids,
+            num_beams=4,
+            length_penalty=2.0,
+            max_length=max_length,
+            min_length=min_length,
             no_repeat_ngram_size=3,
-            early_stopping=True,
+            early_stopping=True
         )
-    summary = bart_tokenizer.decode(summary_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
-    return summary
+        abstractive_chunk = bart_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+        abstractive_chunks.append(abstractive_chunk)
 
-def hybrid_fusion(extractive_sents, abstractive_summary, dedupe_threshold=0.82):
-    """
-    Combine abstractive summary (split to sentences) with extractive sentences.
-    We dedupe by embedding similarity: if a candidate sentence is highly similar to one already taken, skip it.
-    Final ordering: we preserve original order for extractive sentences; abstractive sentences are placed first,
-    but duplicates removed.
-    """
-    abs_sents = sent_tokenize(abstractive_summary)
-    all_candidates = []
-    # mark source type for potential weighting/debugging
-    for s in abs_sents:
-        all_candidates.append(("abs", s))
-    for s in extractive_sents:
-        all_candidates.append(("ext", s))
+    return " ".join(abstractive_chunks)
 
-    final = []
-    final_embeds = []
-    for src, s in all_candidates:
-        emb = sbert.encode(s, convert_to_tensor=True)
-        keep = True
-        for fe in final_embeds:
-            if util.cos_sim(emb, fe).item() >= dedupe_threshold:
-                keep = False
-                break
-        if keep:
-            final.append((src, s))
-            final_embeds.append(emb)
-    # produce final text: we can order by preferring extractive order after abstractive:
+def generate_extractive_summary(transcript, use_abstractive=False):
+    extractive_summary = select_sentences_cluster_with_lead_cosine(transcript)
 
-    abs_final = [s for src, s in final if src == "abs"]
-    ext_final = [s for src, s in final if src == "ext"]
-    final_text = " ".join(abs_final + ext_final)
-    return final_text
+    if use_abstractive:
+        final_summary = abstractive_rewrite_long_summary(extractive_summary)
+    else:
+        final_summary = extractive_summary
 
-def generate_extractive_summary(transcript: str, top_k=8, alpha=0.7) -> str:
-    """
-    Generate an extractive summary from transcript text.
-
-    Args:
-        transcript (str): full transcript text
-        top_k (int): number of sentences to select
-        alpha (float): weight for relevance vs coherence
-
-    Returns:
-        str: extractive summary
-    """
-    sentences = sent_tokenize(transcript)
-    selected_sents, selected_idx, sent_embeds = select_extractive(sentences, top_k=top_k, alpha=alpha)
-    #selected_sents, _, _ = select_extractive(sentences, top_k=top_k, alpha=alpha)
-    bart_input = " ".join(selected_sents)
-    abstractive_summary = abstractive_rewrite(bart_input)
-    final_extractive_summary = hybrid_fusion(selected_sents, abstractive_summary)
-
-    #extractive_summary = " ".join(selected_sents)
-    return final_extractive_summary
-
+    
+    return final_summary
 
 def store_extractive_summary(video_id: str, extractive_summary: str, store_qdrant=True):
     """
