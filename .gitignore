@@ -1,19 +1,31 @@
 # Node.js / React / Vite
-frontend/react-app/node_modules/
-frontend/react-app/dist/
-frontend/react-app/.env
-frontend/react-app/.DS_Store
+node_modules/
+dist/
+build/
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
 
 # Python
-services/*/src/__pycache__/
-services/*/src/*.pyc
-services/*/src/*.pyo
-services/*/src/*.pyd
-services/*/src/.Python
-services/*/src/env/
-services/*/src/venv/
-services/*/src/.env
-services/*/src/.DS_Store
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
 
 # Docker
 **/Dockerfile.*
