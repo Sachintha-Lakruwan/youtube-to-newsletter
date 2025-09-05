@@ -20,34 +20,95 @@ class RetrievalService:
                                 similarity_threshold: float = 0.6, 
                                 limit: int = 100,
                                 time_decay_days: int = 30,
-                                decay_factor: float = 0.02) -> List[Dict[str, Any]]:
+                                decay_factor: float = 0.02,
+                                capture_rejected: bool = False) -> List[Dict[str, Any]]:
         """
         Main retrieval function: 
         1. Get user embedding from Supabase
         2. Perform vector similarity search in Qdrant
         3. Filter out previously watched videos
         4. Apply time decay penalty based on publish date
+        
+        Args:
+            capture_rejected: If True, returns dict with accepted/rejected videos
         """
         try:
             from backend.database.supabase_client import supabase_client
             from backend.database.qdrant_client import qdrant_client
+            import random
             
             # Step 1: Get user embedding
             user_embedding = supabase_client.get_user_embedding(user_id)
             if not user_embedding:
                 logger.warning(f"No user embedding found for {user_id}")
+                if capture_rejected:
+                    return {"accepted": [], "rejected": []}
                 return []
             
-            # Step 2: Vector similarity search  
-            candidate_videos = qdrant_client.vector_similarity_search(
-                query_embedding=user_embedding,
-                similarity_threshold=similarity_threshold,
-                limit=limit
-            )
+            logger.info(f"Retrieved user embedding for {user_id}: {len(user_embedding)} dimensions")
             
-            if not candidate_videos:
-                logger.info(f"No similar videos found for user {user_id}")
-                return []
+            if capture_rejected:
+                # Use very low threshold to get a large pool of videos
+                all_videos = qdrant_client.vector_similarity_search(
+                    query_embedding=user_embedding,
+                    similarity_threshold=0.1,  # Very low threshold to capture more videos
+                    limit=limit * 3  # Get even more videos
+                )
+                
+                logger.info(f"Vector search returned {len(all_videos) if all_videos else 0} videos with threshold 0.1")
+                
+                if not all_videos:
+                    logger.warning(f"No videos found for user {user_id} even with very low threshold")
+                    return {"accepted": [], "rejected": []}
+                
+                # Use a more reasonable threshold for separation to ensure we get rejected videos
+                adjusted_threshold = 0.4  # Lower than original 0.6 to get more rejected videos
+                
+                # Separate videos based on adjusted similarity threshold
+                candidate_videos = []
+                rejected_videos = []
+                
+                for video in all_videos:
+                    # Check both 'score' and 'similarity' fields
+                    score = video.get("score", video.get("similarity", 0))
+                    video["score"] = score  # Normalize to 'score' field
+                    
+                    if score >= adjusted_threshold:
+                        candidate_videos.append(video)
+                    else:
+                        rejected_videos.append(video)
+                
+                logger.info(f"Separated videos: {len(candidate_videos)} candidates (score >= {adjusted_threshold}), {len(rejected_videos)} rejected (score < {adjusted_threshold})")
+                
+                # Debug: Log some sample scores
+                if all_videos:
+                    sample_scores = [v.get("score", v.get("similarity", 0)) for v in all_videos[:5]]
+                    logger.info(f"Sample scores from first 5 videos: {sample_scores}")
+                
+                # If we still don't have rejected videos, force create some from the lower scoring candidates
+                if len(rejected_videos) == 0 and len(all_videos) > 10:
+                    # Sort all videos by score and take the bottom 30% as rejected
+                    all_videos_sorted = sorted(all_videos, key=lambda x: x.get("score", x.get("similarity", 0)), reverse=True)
+                    split_point = int(len(all_videos_sorted) * 0.7)  # Top 70% as candidates, bottom 30% as rejected
+                    candidate_videos = all_videos_sorted[:split_point]
+                    rejected_videos = all_videos_sorted[split_point:]
+                    logger.info(f"Forced separation: {len(candidate_videos)} candidates, {len(rejected_videos)} rejected (bottom 30%)")
+                
+            else:
+                # Normal mode - use standard threshold
+                candidate_videos = qdrant_client.vector_similarity_search(
+                    query_embedding=user_embedding,
+                    similarity_threshold=similarity_threshold,
+                    limit=limit
+                )
+                
+                logger.info(f"Vector search returned {len(candidate_videos) if candidate_videos else 0} videos with threshold {similarity_threshold}")
+                
+                if not candidate_videos:
+                    logger.warning(f"No similar videos found for user {user_id}")
+                    return []
+                
+                rejected_videos = []
             
             # Step 3: Get user's previously watched videos
             watched_video_ids = set(supabase_client.get_user_watched_videos(user_id))
@@ -58,6 +119,16 @@ class RetrievalService:
                 video for video in candidate_videos 
                 if video.get("video_id") not in watched_video_ids
             ]
+            
+            if capture_rejected:
+                # Also filter watched videos from rejected set
+                rejected_unmatched = [
+                    video for video in rejected_videos 
+                    if video.get("video_id") not in watched_video_ids
+                ]
+                logger.info(f"After filtering rejected videos: {len(rejected_unmatched)} unwatched rejected videos from {len(rejected_videos)} total rejected")
+            else:
+                rejected_unmatched = []
             
             logger.info(f"After filtering: {len(unmatched_videos)} unwatched videos from {len(candidate_videos)} candidates")
             
@@ -71,11 +142,26 @@ class RetrievalService:
             # Sort by final score (similarity + time decay)
             videos_with_time_decay.sort(key=lambda x: x.get("final_score", 0), reverse=True)
             
-            logger.info(f"Retrieved {len(videos_with_time_decay)} videos for user {user_id}")
-            return videos_with_time_decay
+            if capture_rejected:
+                # Return both accepted and rejected videos
+                import random
+                random.shuffle(rejected_unmatched)
+                
+                logger.info(f"Vector search: {len(videos_with_time_decay)} candidates for pipeline, {len(rejected_unmatched)} rejected from similarity threshold")
+                
+                return {
+                    "accepted": videos_with_time_decay,
+                    "rejected": rejected_unmatched
+                }
+            else:
+                # Return only accepted videos (normal mode)
+                logger.info(f"Retrieved {len(videos_with_time_decay)} videos for user {user_id}")
+                return videos_with_time_decay
             
         except Exception as e:
             logger.error(f"Error in retrieve_videos_for_user for {user_id}: {str(e)}")
+            if capture_rejected:
+                return {"accepted": [], "rejected": []}
             return []
     
     def _apply_time_decay_penalty(self, videos: List[Dict[str, Any]], 
@@ -274,6 +360,6 @@ class RetrievalService:
         except Exception as e:
             logger.error(f"Error calculating cosine similarity: {str(e)}")
             return 0.0
-
+    
 # Global service instance
 retrieval_service = RetrievalService()

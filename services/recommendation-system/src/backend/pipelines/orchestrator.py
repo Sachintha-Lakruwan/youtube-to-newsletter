@@ -66,16 +66,24 @@ class RecommendationOrchestrator:
             self.graph = None
     
     # @traceable(name="recommendation_pipeline")  # Disabled due to circular reference issues
-    def generate_recommendations(self, user_id: str, top_k: int = 10) -> Dict[str, Any]:
+    def generate_recommendations(self, user_id: str, top_k: int = 10, test_mode: bool = False, 
+                               num_rejected: int = 4) -> Dict[str, Any]:
         """
         Main entry point for generating recommendations
+        
+        Args:
+            user_id: User ID for recommendations
+            top_k: Number of recommendations to return
+            test_mode: If True, returns both recommended and rejected videos for testing
+            num_rejected: Number of rejected videos to return in test mode
         """
+        import random
         start_time = datetime.utcnow()
         
         try:
             initial_state: PipelineState = {
                 "user_id": user_id,
-                "top_k": top_k,
+                "top_k": top_k * 3 if test_mode else top_k,  # Get more candidates in test mode
                 "user_embedding": None,
                 "high_rating_videos": None,
                 "candidate_videos": None,
@@ -84,7 +92,10 @@ class RecommendationOrchestrator:
                 "error": None,
                 "is_new_user": False,
                 "execution_time": None,
-                "newsletter_id": None
+                "newsletter_id": None,
+                "capture_rejected": test_mode,  # Enable rejected video capture in test mode
+                "rejected_videos": None,
+                "all_candidate_videos": None
             }
             
             if self.graph:
@@ -100,38 +111,96 @@ class RecommendationOrchestrator:
                     result = rerank_videos_node(result)
                 if not result.get("error"):
                     result = diversity_filter_node(result)
-                if not result.get("error"):
+                if not result.get("error") and not test_mode:
+                    # Only store newsletter in production mode
                     result = store_newsletter_node(result)
+                elif test_mode:
+                    # Simulate newsletter storage step for test mode
+                    result["pipeline_step"] = "storing_newsletter"
             
             execution_time = (datetime.utcnow() - start_time).total_seconds()
             result["execution_time"] = execution_time
             
             logger.info(f"Pipeline completed for user {user_id} in {execution_time:.2f}s")
             
-            return {
-                "user_id": user_id,
-                "recommendations": result.get("final_list", []),
-                "newsletter_id": result.get("newsletter_id"),  # Include newsletter ID from pipeline state
-                "metadata": {
-                    "execution_time": execution_time,
-                    "total_candidates": len(result.get("candidate_videos", [])),
-                    "is_new_user": result.get("is_new_user", False),
-                    "pipeline_step": result.get("pipeline_step", "completed"),
-                    "newsletter_stored": result.get("newsletter_id") is not None
+            if test_mode:
+                # TEST MODE: Return both recommended and rejected videos
+                final_recommendations = result.get("final_list", [])
+                accepted_videos = final_recommendations[:top_k]  # Top N from rerank output
+                
+                # Get rejected videos from vector similarity search stage
+                rejected_videos = result.get("rejected_videos", [])
+                
+                # Debug logging
+                logger.info(f"DEBUG: result keys: {list(result.keys())}")
+                logger.info(f"DEBUG: rejected_videos from result: {len(rejected_videos)}")
+                logger.info(f"DEBUG: final_recommendations: {len(final_recommendations)}")
+                
+                random_rejected = random.sample(rejected_videos, min(num_rejected, len(rejected_videos))) if rejected_videos else []
+                
+                logger.info(f"Test pipeline results: {len(accepted_videos)} recommended, {len(random_rejected)} rejected")
+                
+                return {
+                    "user_id": user_id,
+                    "recommended_videos": accepted_videos,  # Videos from rerank output
+                    "rejected_videos": random_rejected,     # Videos rejected at vector search stage
+                    "metadata": {
+                        "execution_time": execution_time,
+                        "total_candidates": len(result.get("candidate_videos", [])),
+                        "total_rejected": len(rejected_videos),
+                        "is_new_user": result.get("is_new_user", False),
+                        "pipeline_step": result.get("pipeline_step", "completed")
+                    }
                 }
-            }
+            else:
+                # PRODUCTION MODE: Return normal recommendations
+                return {
+                    "user_id": user_id,
+                    "recommendations": result.get("final_list", []),
+                    "newsletter_id": result.get("newsletter_id"),
+                    "metadata": {
+                        "execution_time": execution_time,
+                        "total_candidates": len(result.get("candidate_videos", [])),
+                        "is_new_user": result.get("is_new_user", False),
+                        "pipeline_step": result.get("pipeline_step", "completed"),
+                        "newsletter_stored": result.get("newsletter_id") is not None
+                    }
+                }
             
         except Exception as e:
             logger.error(f"Error in recommendation pipeline for user {user_id}: {str(e)}")
-            return {
-                "user_id": user_id,
-                "recommendations": [],
-                "error": str(e),
-                "metadata": {
-                    "execution_time": (datetime.utcnow() - start_time).total_seconds(),
-                    "pipeline_step": "error"
+            if test_mode:
+                return {
+                    "user_id": user_id,
+                    "recommended_videos": [],
+                    "rejected_videos": [],
+                    "error": str(e),
+                    "metadata": {
+                        "execution_time": (datetime.utcnow() - start_time).total_seconds(),
+                        "pipeline_step": "error"
+                    }
                 }
-            }
+            else:
+                return {
+                    "user_id": user_id,
+                    "recommendations": [],
+                    "error": str(e),
+                    "metadata": {
+                        "execution_time": (datetime.utcnow() - start_time).total_seconds(),
+                        "pipeline_step": "error"
+                    }
+                }
+    
+    def generate_test_recommendations(self, user_id: str, num_recommended: int = 4, num_rejected: int = 4) -> Dict[str, Any]:
+        """
+        Wrapper method for backward compatibility - calls main function with test_mode=True
+        """
+        return self.generate_recommendations(
+            user_id=user_id, 
+            top_k=num_recommended, 
+            test_mode=True, 
+            num_rejected=num_rejected
+        )
     
 # Global orchestrator instance
 recommendation_orchestrator = RecommendationOrchestrator()

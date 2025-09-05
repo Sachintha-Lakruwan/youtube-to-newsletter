@@ -16,6 +16,11 @@ class PipelineState(TypedDict, total=False):
     candidate_videos: Optional[List[Dict[str, Any]]]
     final_list: Optional[List[Dict[str, Any]]]
     
+    # Test feature data
+    rejected_videos: Optional[List[Dict[str, Any]]]  # Videos below threshold
+    all_candidate_videos: Optional[List[Dict[str, Any]]]  # Before filtering
+    capture_rejected: Optional[bool]  # Flag to enable rejected video capture
+    
     # Pipeline metadata
     pipeline_step: str
     error: Optional[str]

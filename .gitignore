@@ -14,6 +14,7 @@ services/*/src/env/
 services/*/src/venv/
 services/*/src/.env
 services/*/src/.DS_Store
+services/recommendation-system/src/myenv
 
 # Docker
 **/Dockerfile.*

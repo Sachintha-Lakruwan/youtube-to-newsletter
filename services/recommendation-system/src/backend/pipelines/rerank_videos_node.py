@@ -15,13 +15,15 @@ def rerank_videos_node(state: PipelineState) -> PipelineState:
     Stage 2: Pairwise analysis with feedback videos → final ranking
     """
     try:
-        #print(state["candidate_videos"])
+        
         state["pipeline_step"] = "reranking"
         logger.info(f"Starting two-stage reranking for user {state['user_id']}")
         
         # Debug: Check what we received
         logger.info(f"DEBUG: Received state type: {type(state)}")
         candidate_videos = state.get("candidate_videos")
+        print(state["candidate_videos"])
+        print("Hubaa")
         if candidate_videos:
             logger.info(f"DEBUG: candidate_videos length: {len(candidate_videos)}")
             logger.info(f"DEBUG: candidate_videos type: {type(candidate_videos)}")
