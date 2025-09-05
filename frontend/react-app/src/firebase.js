@@ -1,19 +1,16 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
-let app;
-let auth;
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_APIKEY,
+  authDomain: import.meta.env.VITE_AUTHDOMAIN,
+  projectId: import.meta.env.VITE_PROJECTID,
+  storageBucket: import.meta.env.VITE_STORAGEBUCKET,
+  messagingSenderId: import.meta.env.VITE_MESSAGINGSENDERID,
+  appId: import.meta.env.VITE_APPID,
+};
 
+const app = initializeApp(firebaseConfig);
+
+export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
-
-export async function initFirebase() {
-  if (app) return { app, auth };
-
-  const res = await fetch("/config");
-  const firebaseConfig = await res.json();
-
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-
-  return { app, auth };
-}
