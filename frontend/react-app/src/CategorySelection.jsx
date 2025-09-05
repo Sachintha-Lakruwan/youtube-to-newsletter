@@ -88,7 +88,7 @@ export default function CategorySelection({
 
   return (
     <div className=" w-full h-full flex flex-col gap-12 items-center ">
-      <h1 className=" text-3xl font-bold">Pick Some!</h1>
+      <h1 className=" text-3xl font-bold">My preferences</h1>
       <div className=" flex flex-wrap justify-center gap-4 max-w-[500px] mx-auto ">
         {categories.map((category) => (
           <div
