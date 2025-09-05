@@ -1,7 +1,7 @@
 import "./App.css";
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { FcGoogle } from "react-icons/fc";
 import Wrapper from "./Background";
@@ -17,14 +17,6 @@ function Home() {
       console.log("User Info:", result.user);
     } catch (error) {
       console.error("Error during sign in:", error);
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Error during sign out:", error);
     }
   };
 
