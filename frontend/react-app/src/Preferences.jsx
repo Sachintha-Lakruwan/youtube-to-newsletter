@@ -9,10 +9,44 @@ import CategorySelection from "./CategorySelection";
 export default function Preferences() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState([]);
+
+  const url = import.meta.env.VITE_USER_MANAGEMENT_API + "/preferences";
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsAuthenticated(!!user);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsAuthenticated(true);
+
+        try {
+          const token = await user.getIdToken();
+          const email = user.email;
+
+          const query = new URLSearchParams({ email }).toString();
+
+          const res = await fetch(`${url}?${query}`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!res.ok) throw new Error("Failed to fetch");
+
+          const json = await res.json();
+          setSelectedCategories(json);
+
+          if (json.preferences?.topic) {
+            setSelectedCategories(json.preferences.topic.split(" and "));
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        setIsAuthenticated(false);
+      }
     });
+
     return () => unsubscribe();
   }, []);
 

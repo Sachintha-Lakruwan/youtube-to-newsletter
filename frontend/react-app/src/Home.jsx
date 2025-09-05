@@ -5,9 +5,12 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { FcGoogle } from "react-icons/fc";
 import Wrapper from "./Background";
+import { useNavigate } from "react-router-dom";
 
 function Home() {
   const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+
   const handleGoogleSignIn = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -43,9 +46,23 @@ function Home() {
         {user ? (
           <div className="user-welcome">
             <p>Welcome, {user.displayName}</p>
-            <button className="btn btn-google" onClick={handleSignOut}>
+            {/* <button className="btn btn-google" onClick={handleSignOut}>
               Sign Out
-            </button>
+            </button> */}
+            <div className=" flex gap-3">
+              <button
+                className="btn btn-google"
+                onClick={() => navigate("/newsletters")}
+              >
+                News Letters 📧
+              </button>
+              <button
+                className="btn btn-google"
+                onClick={() => navigate("/preferences")}
+              >
+                Preferences ⚙️
+              </button>
+            </div>
           </div>
         ) : (
           <button className="btn btn-google" onClick={handleGoogleSignIn}>
