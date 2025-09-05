@@ -11,7 +11,7 @@ require("dotenv").config();
 
 const api = process.env.API_URL || "/api/v1";
 const mongoUri = process.env.MONGO_URI;
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080;
 
 //MongoDB connection
 mongoose
