@@ -38,6 +38,9 @@ app.get(`${api}/health`, (req, res) => {
 const keyWordsRouter = require("./routers/keywords");
 app.use(`${api}/keywords`, keyWordsRouter);
 
+const preferencesRouter = require("./routers/preferences");
+app.use(`${api}/preferences`, preferencesRouter);
+
 // Root endpoint
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -46,6 +49,7 @@ app.get("/", (req, res) => {
     endpoints: {
       health: `${api}/health`,
       keywords: `${api}/keywords`,
+      preferences: `${api}/preferences`,
     },
   });
 });

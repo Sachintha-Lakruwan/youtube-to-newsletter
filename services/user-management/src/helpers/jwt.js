@@ -18,6 +18,7 @@ const authFirebase = () => {
       "/",
       `${api}/keywords`,
       `${api}/keywords/batch`,
+      `${api}/preferences`,
     ];
     if (openPaths.includes(req.path)) return next();
 
