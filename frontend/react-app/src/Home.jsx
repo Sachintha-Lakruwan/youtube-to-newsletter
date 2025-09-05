@@ -51,13 +51,13 @@ function Home() {
             </button> */}
             <div className=" flex gap-3">
               <button
-                className="btn btn-google"
+                className="btn btn-google "
                 onClick={() => navigate("/newsletters")}
               >
                 News Letters 📧
               </button>
               <button
-                className="btn btn-google"
+                className="btn btn-google "
                 onClick={() => navigate("/preferences")}
               >
                 Preferences ⚙️

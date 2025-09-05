@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getAuth } from "firebase/auth";
+import { ImSpinner6 } from "react-icons/im";
 
 export default function CategorySelection({
   selectedCategories,
@@ -7,6 +8,7 @@ export default function CategorySelection({
 }) {
   const [categories, setCategories] = useState([]);
   const [newCategory, setNewCategory] = useState("");
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
   const [userInfo, setUserInfo] = useState({ email: "", token: "" });
   const url = import.meta.env.VITE_USER_MANAGEMENT_API + "/keywords";
   const url_preferences =
@@ -14,6 +16,7 @@ export default function CategorySelection({
   const auth = getAuth();
 
   function updateKeyWords() {
+    setLoadingSubmit(true);
     const data = {
       email: userInfo.email,
       keywords: selectedCategories,
@@ -28,7 +31,9 @@ export default function CategorySelection({
       body: JSON.stringify(data),
     })
       .then((res) => {
+        setLoadingSubmit(false);
         if (!res.ok) throw new Error("Submitting categories was not ok");
+        alert("Your preferences updated!");
         return res.json();
       })
       .then((json) => {
@@ -126,10 +131,17 @@ export default function CategorySelection({
         />
       </div>
       <button
-        className=" !rounded-full !px-7 !bg-white !text-zinc-900 cursor-pointer"
+        className=" !rounded-full !w-26 !bg-white !text-zinc-900 cursor-pointer flex items-center justify-center gap-2"
         onClick={updateKeyWords}
       >
-        Save
+        Save{" "}
+        <span
+          className={`${
+            loadingSubmit && "animate-spin inline-block"
+          } hidden text-sm`}
+        >
+          <ImSpinner6 />
+        </span>
       </button>
     </div>
   );
